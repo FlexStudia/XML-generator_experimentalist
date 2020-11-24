@@ -644,9 +644,10 @@ class Ui_experimentalist_window(object):
                                                "<html><head/><body>"
                                                "<p>Add one more previous laboratory</p></body></html>"))
         self.p_lab_btn_6.setText(_translate("experimentalist_window", "Previous Lab 6"))
-        self.tabWidget.setTabText(self.tabWidget.indexOf(self.tab_5), _translate("experimentalist_window", "5 Previous"))
+        self.tabWidget.setTabText(self.tabWidget.indexOf(self.tab_5),
+                                  _translate("experimentalist_window", "5 Previous"))
         self.label_20.setText(_translate("experimentalist_window", "**: This information is mandatory\n"
-                                         "*: This information is recommended"))
+                                                                   "*: This information is recommended"))
         self.buttonBox.setText(_translate("experimentalist_window", "Fill the XML template with this information"))
 
 
@@ -884,6 +885,7 @@ class XMLTemplateExperimentalist(QtWidgets.QDialog):
             string_var = string_var.replace("ù", "u")
             string_var = string_var.replace("ú", "u")
             string_var = string_var.replace("û", "u")
+            string_var = string_var.replace("û", "u")
             string_var = string_var.replace("ü", "u")
             # y
             string_var = string_var.replace("ý", "y")
@@ -899,7 +901,7 @@ class XMLTemplateExperimentalist(QtWidgets.QDialog):
             AbsMandatoryWarning('Family name', '')
             self.ui.tabWidget.setCurrentIndex(0)
             self.ui.family_name.setFocus()
-        elif labs_current_data_array[0] == [] and labs_current_data_array[1] == [] and labs_current_data_array[2] == []\
+        elif labs_current_data_array[0] == [] and labs_current_data_array[1] == [] and labs_current_data_array[2] == [] \
                 and labs_current_data_array[3] == []:
             AbsMandatoryWarning('At least on current lab', '')
             self.ui.tabWidget.setCurrentIndex(3)
@@ -926,25 +928,28 @@ class XMLTemplateExperimentalist(QtWidgets.QDialog):
                         labs_current_data_array[d][3][5:7]) * 30 + int(labs_current_data_array[d][3][8:])])
             index_array_current.sort(key=take_second)
             # FILLING the XML
-            parser = etree.XMLParser(remove_blank_text = True)
+            parser = etree.XMLParser(remove_blank_text=True)
             xml_root = etree.fromstring(xml_template.encode("utf8"), parser)
             for child in xml_root.find("{http://sshade.eu/schema/import}experimentalist").getchildren():
                 if child.tag == "{http://sshade.eu/schema/import}uid":
                     child.clear()
-                    child.text = "EXPER_" + special_characters_replace(self.ui.first_name.text().strip()).capitalize(). \
-                        replace(" ", "-") + "_" + special_characters_replace(self.ui.family_name.text().strip()).\
-                                                                             capitalize().replace(" ", "-")
+                    uid = "EXPER_" + special_characters_replace(self.ui.first_name.text().strip()).capitalize(). \
+                        replace(" ", "-") + "_" + special_characters_replace(self.ui.family_name.text().strip()). \
+                              capitalize().replace(" ", "-")
+                    child.text = uid
                     comment_verify = etree.Comment(" %%% TO VERIFY ")
                     child.insert(0, comment_verify)
                 if child.tag == "{http://sshade.eu/schema/import}first_name":
                     child.clear()
-                    if self.ui.first_name.text().strip() == special_characters_replace(self.ui.first_name.text().strip()):
+                    if self.ui.first_name.text().strip() == special_characters_replace(
+                            self.ui.first_name.text().strip()):
                         child.text = self.ui.first_name.text().strip()
                     else:
                         child.text = etree.CDATA(self.ui.first_name.text().strip())
                 if child.tag == "{http://sshade.eu/schema/import}family_name":
                     child.clear()
-                    if self.ui.family_name.text().strip() == special_characters_replace(self.ui.family_name.text().strip()):
+                    if self.ui.family_name.text().strip() == special_characters_replace(
+                            self.ui.family_name.text().strip()):
                         child.text = self.ui.family_name.text().strip()
                     else:
                         child.text = etree.CDATA(self.ui.family_name.text().strip())
@@ -953,12 +958,14 @@ class XMLTemplateExperimentalist(QtWidgets.QDialog):
                     acronym = self.ui.first_name.text().strip()[0].upper()
                     for n in range(len(self.ui.first_name.text().strip())):
                         if n < len(self.ui.first_name.text().strip()) - 1 and (
-                                self.ui.first_name.text().strip()[n] == " " or self.ui.first_name.text().strip()[n] == "-"):
+                                self.ui.first_name.text().strip()[n] == " " or self.ui.first_name.text().strip()[
+                            n] == "-"):
                             acronym = acronym + self.ui.first_name.text().strip()[n + 1].upper()
                     acronym = acronym + self.ui.family_name.text().strip()[0].upper()
                     for n in range(len(self.ui.family_name.text().strip())):
                         if n < len(self.ui.family_name.text().strip()) - 1 and (
-                                self.ui.family_name.text().strip()[n] == " " or self.ui.family_name.text().strip()[n] == "-"):
+                                self.ui.family_name.text().strip()[n] == " " or self.ui.family_name.text().strip()[
+                            n] == "-"):
                             acronym = acronym + self.ui.family_name.text().strip()[n + 1].upper()
                     child.text = special_characters_replace(acronym)
                     comment_verify = etree.Comment(" %%% TO VERIFY ")
@@ -1356,13 +1363,11 @@ class XMLTemplateExperimentalist(QtWidgets.QDialog):
 
             # SAVING the XML file
             options = QFileDialog.Options()
-            file_name, _ = QFileDialog.getSaveFileName(self, "Save File",
-                                                       f"experimentalist_{self.ui.family_name.text().strip()}-"
-                                                       f"{self.ui.first_name.text().strip()}"
-                                                       f".xml", "Text Files (*.xml)", options=options)
+            file_name, _ = QFileDialog.getSaveFileName(self, "Save File", f"{uid}.xml",
+                                                       "Text Files (*.xml)", options=options)
             if file_name:
-                str_to_upload = etree.tostring(xml_root, pretty_print = True, encoding = "utf-8",
-                                               xml_declaration = True, method = "xml")
+                str_to_upload = etree.tostring(xml_root, pretty_print=True, encoding="utf-8",
+                                               xml_declaration=True, method="xml")
                 with open(file_name, 'wb') as file_output:
                     file_output.write(str_to_upload)
                 SavingOK()
@@ -1496,15 +1501,16 @@ class XMLTemplateCurrentLab(QtWidgets.QDialog):
             self.ui.c_status.setCurrentIndex(labs_current_data_array[current_lab_edit - 1][1])
         # begin date
         self.ui.c_begin_date.setStyleSheet('QDateEdit{border-width: 2px; border-style: solid; border-color: '
-                                        'rgb(251,157,111); background-color: rgb(255,250,245); padding: 5px}')
+                                           'rgb(251,157,111); background-color: rgb(255,250,245); padding: 5px}')
         self.ui.c_begin_date.setDisplayFormat('yyyy-MM-dd')
         if labs_current_data_array[current_lab_edit - 1]:
-            self.ui.c_begin_date.setDate(QDate.fromString(labs_current_data_array[current_lab_edit - 1][3], 'yyyy-MM-dd'))
+            self.ui.c_begin_date.setDate(
+                QDate.fromString(labs_current_data_array[current_lab_edit - 1][3], 'yyyy-MM-dd'))
         else:
             self.ui.c_begin_date.setDate(QDate.fromString('1900-01-01', 'yyyy-MM-dd'))
         # additional information
         self.ui.c_lab_comment.setStyleSheet('QTextEdit{border-width: 2px; border-style: solid; border-color: '
-                                         'rgb(86,231,200); background-color: rgb(249,255,254); padding: 5px}')
+                                            'rgb(86,231,200); background-color: rgb(249,255,254); padding: 5px}')
         if labs_current_data_array[current_lab_edit - 1]:
             self.ui.c_lab_comment.setPlainText(labs_current_data_array[current_lab_edit - 1][4])
         # button
@@ -1555,7 +1561,8 @@ class XMLTemplateCurrentLab(QtWidgets.QDialog):
                 labs_current_data_array[self.current_lab_edit - 1][0] = self.ui.c_lab_acronym.text()
                 labs_current_data_array[self.current_lab_edit - 1][1] = self.ui.c_status.currentIndex()
                 labs_current_data_array[self.current_lab_edit - 1][2] = self.ui.c_status.currentText()
-                labs_current_data_array[self.current_lab_edit - 1][3] = self.ui.c_begin_date.date().toString("yyyy-MM-dd")
+                labs_current_data_array[self.current_lab_edit - 1][3] = self.ui.c_begin_date.date().toString(
+                    "yyyy-MM-dd")
                 labs_current_data_array[self.current_lab_edit - 1][4] = self.ui.c_lab_comment.toPlainText()
             self.close()
 
@@ -1686,14 +1693,14 @@ class XMLTemplatePreviousLab(QtWidgets.QDialog):
         self.setWindowTitle(f'Add/Edit previous lab {previous_lab_edit}')
         # acronym
         self.ui.p_lab_acronym.setStyleSheet('QLineEdit{border-width: 2px; border-style: solid; border-color: '
-                                         'rgb(251,157,111); background-color: rgb(255,250,245); '
-                                         'padding: 5px}')
+                                            'rgb(251,157,111); background-color: rgb(255,250,245); '
+                                            'padding: 5px}')
         if labs_previous_data_array[previous_lab_edit - 1]:
             self.ui.p_lab_acronym.setText(labs_previous_data_array[previous_lab_edit - 1][0])
         # status
         self.ui.p_status.setStyleSheet('QComboBox{border-width: 2px; border-style: solid; '
-                                    'border-color: rgb(240,200,41); background-color: rgb(253,253,241); '
-                                    'padding: 5px}')
+                                       'border-color: rgb(240,200,41); background-color: rgb(253,253,241); '
+                                       'padding: 5px}')
         self.ui.p_status.insertItem(0, 'no status')
         self.ui.p_status.insertItem(1, 'researcher')
         self.ui.p_status.insertItem(2, 'engineer')
@@ -1705,8 +1712,8 @@ class XMLTemplatePreviousLab(QtWidgets.QDialog):
             self.ui.p_status.setCurrentIndex(labs_previous_data_array[previous_lab_edit - 1][1])
         # begin date
         self.ui.p_begin_date.setStyleSheet('QDateEdit{border-width: 2px; border-style: solid; '
-                                        'border-color: rgb(251,157,111); background-color: rgb(255,250,245); '
-                                        'padding: 5px}')
+                                           'border-color: rgb(251,157,111); background-color: rgb(255,250,245); '
+                                           'padding: 5px}')
         self.ui.p_begin_date.setDisplayFormat('yyyy-MM-dd')
         if labs_previous_data_array[previous_lab_edit - 1]:
             self.ui.p_begin_date.setDate(
@@ -1715,17 +1722,18 @@ class XMLTemplatePreviousLab(QtWidgets.QDialog):
             self.ui.p_begin_date.setDate(QDate.fromString('1900-01-01', 'yyyy-MM-dd'))
         # end date
         self.ui.p_end_date.setStyleSheet('QDateEdit{border-width: 2px; border-style: solid; '
-                                      'border-color: rgb(251,157,111); background-color: rgb(255,250,245); '
-                                      'padding: 5px}')
+                                         'border-color: rgb(251,157,111); background-color: rgb(255,250,245); '
+                                         'padding: 5px}')
         self.ui.p_end_date.setDisplayFormat('yyyy-MM-dd')
         if labs_previous_data_array[previous_lab_edit - 1]:
-            self.ui.p_end_date.setDate(QDate.fromString(labs_previous_data_array[previous_lab_edit - 1][4], 'yyyy-MM-dd'))
+            self.ui.p_end_date.setDate(
+                QDate.fromString(labs_previous_data_array[previous_lab_edit - 1][4], 'yyyy-MM-dd'))
         else:
             self.ui.p_end_date.setDate(QDate.fromString('1900-01-01', 'yyyy-MM-dd'))
         # additional information
         self.ui.p_lab_comment.setStyleSheet('QTextEdit{border-width: 2px; border-style: solid; '
-                                         'border-color: rgb(86,231,200); background-color: rgb(249,255,254); '
-                                         'padding: 5px}')
+                                            'border-color: rgb(86,231,200); background-color: rgb(249,255,254); '
+                                            'padding: 5px}')
         if labs_previous_data_array[previous_lab_edit - 1]:
             self.ui.p_lab_comment.setPlainText(labs_previous_data_array[previous_lab_edit - 1][5])
         # button
@@ -1784,7 +1792,8 @@ class XMLTemplatePreviousLab(QtWidgets.QDialog):
                 labs_previous_data_array[self.previous_lab_edit - 1][2] = self.ui.p_status.currentText()
                 labs_previous_data_array[self.previous_lab_edit - 1][3] = self.ui.p_begin_date.date().toString(
                     "yyyy-MM-dd")
-                labs_previous_data_array[self.previous_lab_edit - 1][4] = self.ui.p_end_date.date().toString("yyyy-MM-dd")
+                labs_previous_data_array[self.previous_lab_edit - 1][4] = self.ui.p_end_date.date().toString(
+                    "yyyy-MM-dd")
                 labs_previous_data_array[self.previous_lab_edit - 1][5] = self.ui.p_lab_comment.toPlainText()
             self.close()
 
@@ -1862,4 +1871,3 @@ win = XMLTemplateExperimentalist()
 win.setWindowFlags(Qt.WindowMinimizeButtonHint | Qt.WindowCloseButtonHint)
 win.show()
 sys.exit(app.exec())
-
