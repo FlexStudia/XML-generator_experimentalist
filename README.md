@@ -58,10 +58,3 @@ for any questions, proposals and bug reports, please write to XML.generator.expe
 CC-BY 4.0 (Authors attribution alone required)
 
 for more info: [creativecommons.org](https://creativecommons.org/licenses/by/4.0/deed.fr)
-	
-  
-**Changelog**
-
-28.08.20: version 0.95 is officially released at [wiki.sshade.eu](wiki.sshade.eu/sshade/tools) as cross-platform executables
-
-22.10.29: projct added to [GitHub](https://github.com/FlexStudia/XML-generator_experimentalist)
