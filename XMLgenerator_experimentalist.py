@@ -2,19 +2,21 @@
 
 # IMPORTS
 from PyQt5 import QtWidgets, QtGui, QtCore
-from PyQt5.QtWidgets import QFileDialog, QMessageBox, QVBoxLayout, QLabel, QPushButton
+from PyQt5.QtWidgets import QFileDialog, QMessageBox, QVBoxLayout, QLabel, QPushButton, QAction
 from PyQt5.QtCore import Qt, QDate
 from lxml import etree
 import sys
+# external templates
+from source.wt import Ui_MainWindow as Ui_experimentalist_window
+from source.clt import Ui_CurrentLab as Ui_CurrentLab
+from source.plt import Ui_PreviousLab as Ui_PreviousLab
 
 # GLOBALS
-__version__ = 0.95
-__copyright__ = "CC-BY 4.0 (Authors attribution alone required)"
+__version__ = 1.2
+__copyright__ = "<a href='https://creativecommons.org/licenses/by/4.0/deed.fr'>CC-BY 4.0</a> (Authors attribution alone required)"
+__GitHub_repos__ = "https://github.com/FlexStudia/XML-generator_experimentalist"
 __author_mail__ = "flex.studia.dev@gmail.com"
 __bug_support_mail__ = "XML.generator.experimentalist@gmail.com"
-
-# style
-font_size = 10
 
 # XML
 xml_template = "<?xml version='1.0' encoding='UTF-8'?><!--  Data type : Experimentalist Specific notes : 	- General notes :  	- Most of the tags are optional, you can remove the really unnecessary ones. 	- Tags marked as 'multiple' can be copied (with its block of sub-tag, up to the ending tag) if needed. 	- all blocs marked 'OPTION' can be fully removed if not needed (now or in the future) 	- **ABS MANDATORY / ABS COMPULSORY**: a value need to be absolutely provided, no way to escape! (SSHADE will not function properly if absent). 	- **MANDATORY / COMPULSORY**: very important values for the search of the data. If the value (txt or numeric) of one tag is not known (or irrelevant in your case), then put 'NULL' and write a comment to keep track of the missing value. Remove comment when value is added. 	- **MANDATORY / COMPULSORY only for ...**: when a value is optionally MANDATORY the condition is written.  	- 'LINK to existing UID' (unique identifier): references to another table in SSHADE. You have to reconstruct (easy for some: rule is in comment) or found this existing UID in the database beforehand (use 'Provider/Full Search' menu in SSHADE). 	- 'UID to CREATE': you need to create this UID using their specific rules of creation that are explained in their attached comment. Use only alphanumeric characters and '_'. 	- For UID you can use only alpha-numeric characters and the following: '_', '-' 	- Enumeration type ('Enum' or 'OpenEnum') must contain one single item from the list given in brackets {}. 	- use a CDATA tag when a value contains at least one special character (ie: &, >, <,...). Example: <![CDATA[AT&T]]> for AT&T 	- The data format is noted beetween [] and is 'ascii' when not specified. Ex: [Float], [Integer]. For [float] 2 formats are possible: decimal (123.456) or scientific (1.234e-56)   	- when no numerical format or Enum is specified, it is free text but limited to 256 characters. Only those noted [blob] have no size limitation. 	- to import data for the first time you have to set <import_mode>='first import'. To correct data you have to change it to 'correction'. 	- when a <filename> is given, then the file should be ziped with this xml file for import.  --><import type='experimentalist' ssdm_version='0.9.0' xmlns='http://sshade.eu/schema/import' xmlns:xsi='http://www.w3.org/2001/XMLSchema-instance' xsi:schemaLocation='http://sshade.eu/schema/import http://sshade.eu/schema/import-0.9.xsd'><experimentalist><!-- multiple --><import_mode>first import</import_mode> <!-- **ABS MANDATORY** Mode of import of the experimentalist data. Enum: {first import, ignore, draft, no change, correction} --><uid>EXPER_</uid> <!-- **ABS MANDATORY to CREATE** Unique identifier code given to the experimentalist. Should be of the style ‘EXPER_Firstname_Lastname(_n)’ --><manager_databases> <!-- **ABS MANDATORY at least one** --><database_uid>DB_</database_uid> <!-- **ABS MANDATORY** LINK to the existing UID of the database which manages the experimentalist information [‘DB_DatabaseAcronym’] -->	</manager_databases><!-- EXPERIMENTALIST NAME --><first_name></first_name> <!-- **ABS MANDATORY, requested for DOI** First name (given name) --><family_name></family_name> <!-- **ABS MANDATORY, requested for DOI** Family name (last name) --><acronym></acronym> <!-- **MANDATORY** Initials of first and last name. Ex: BS, FROD --><orcid_identifier></orcid_identifier> <!-- **MANDATORY** ORCID identifier code that uniquely identify the experimentalist --><alternate_identifiers> <!-- **OPTION** --><alternate_identifier><!-- multiple --><scheme></scheme> <!-- **ABS MANDATORY in OPTION** Alternate scheme that provideds the unique identifiers of the experimentalist. Enum: {ISNI, ResearcherID, ScopusAuthorID} --><code></code> <!-- **ABS MANDATORY in OPTION** Alternate code that uniquely identify the experimentalist in this scheme --></alternate_identifier></alternate_identifiers><state>active</state> <!-- XXX-BS 090a NEW **ABS MANDATORY** State of activity of the experimentalist. Enum: {active, inactive, retired, deceased}. default = ‘active’ --><!-- EXPERIMENTALIST LABORATORIES --><laboratories> <!-- **ABS MANDATORY at least one** Put in chronological order --><laboratory state='current'><!-- multiple --> <!-- **ABS MANDATORY, at least one 'current' for 'active', all 'previous' for others** Enum of 'state': {previous, current} --><uid></uid> <!-- **ABS MANDATORY** LINK to the existing UID of the current laboratory where the experimentalist works [‘LAB_LabAcronym’] --><status></status> <!-- **MANDATORY for current laboratory** Status of the experimentalist in this laboratory. Enum: {researcher, engineer, post-doc, PhD student, master student, undergraduate student} --><date_begin></date_begin> <!-- **ABS MANDATORY for current lab** Beginning date of the experimentalist in this laboratory. [Format: ‘YYYY-MM-DD’] Ex: '1999-10-05' --><date_end></date_end> <!-- **ABS MANDATORY for previous lab** Ending date of the experimentalist in this laboratory. [Format: ‘YYYY-MM-DD’] Ex: '1999-10-05', '' --><comments><![CDATA[]]></comments> <!-- Additional information ... [blob] --></laboratory></laboratories><!-- EXPERIMENTALIST CONTACTS --><email></email> <!-- **MANDATORY** Current e-mail of the experimentalist. Will be used as login --><phone></phone> <!-- Current phone number of the experimentalist. ex: +33(0)7 06 05 04 01 --><links> <!-- **OPTION** Link(s) to current web page(s) of the experimentalist --><link><!-- multiple --> <name><![CDATA[]]></name> <!-- Name of the web page(s) --><url><![CDATA[]]></url> <!-- **MANDATORY in OPTION** URL address (avoid non-perennial commercial URL) --></link></links><comments><![CDATA[]]></comments> <!-- Additional information on the experimentalist [blob] --></experimentalist></import>"
@@ -24,635 +26,8 @@ labs_current_data_array = [[], [], [], []]
 labs_previous_data_array = [[], [], [], [], [], []]
 
 
-# MAIN WINDOW interface
-class Ui_experimentalist_window(object):
-    def setupUi(self, experimentalist_window):
-        experimentalist_window.setObjectName("experimentalist_window")
-        experimentalist_window.resize(477, 679)
-        sizePolicy = QtWidgets.QSizePolicy(QtWidgets.QSizePolicy.Minimum, QtWidgets.QSizePolicy.Minimum)
-        sizePolicy.setHorizontalStretch(0)
-        sizePolicy.setVerticalStretch(0)
-        sizePolicy.setHeightForWidth(experimentalist_window.sizePolicy().hasHeightForWidth())
-        experimentalist_window.setSizePolicy(sizePolicy)
-        experimentalist_window.setMinimumSize(QtCore.QSize(475, 0))
-        font = QtGui.QFont()
-        font.setPointSize(int(f'{font_size}'))
-        experimentalist_window.setFont(font)
-        experimentalist_window.setSizeGripEnabled(False)
-        self.verticalLayout_2 = QtWidgets.QVBoxLayout(experimentalist_window)
-        self.verticalLayout_2.setObjectName("verticalLayout_2")
-        self.gridLayout_8 = QtWidgets.QGridLayout()
-        self.gridLayout_8.setObjectName("gridLayout_8")
-        self.about_btn = QtWidgets.QPushButton(experimentalist_window)
-        sizePolicy = QtWidgets.QSizePolicy(QtWidgets.QSizePolicy.Fixed, QtWidgets.QSizePolicy.Fixed)
-        sizePolicy.setHorizontalStretch(0)
-        sizePolicy.setVerticalStretch(0)
-        sizePolicy.setHeightForWidth(self.about_btn.sizePolicy().hasHeightForWidth())
-        self.about_btn.setSizePolicy(sizePolicy)
-        self.about_btn.setMaximumSize(QtCore.QSize(25, 16777215))
-        font = QtGui.QFont()
-        font.setPointSize(int(f'{font_size}') - 2)
-        self.about_btn.setFont(font)
-        self.about_btn.setObjectName("about_btn")
-        self.gridLayout_8.addWidget(self.about_btn, 0, 1, 1, 1)
-        self.header = QtWidgets.QLabel(experimentalist_window)
-        sizePolicy = QtWidgets.QSizePolicy(QtWidgets.QSizePolicy.Preferred, QtWidgets.QSizePolicy.Preferred)
-        sizePolicy.setHorizontalStretch(0)
-        sizePolicy.setVerticalStretch(0)
-        sizePolicy.setHeightForWidth(self.header.sizePolicy().hasHeightForWidth())
-        self.header.setSizePolicy(sizePolicy)
-        font = QtGui.QFont()
-        font.setPointSize(int(f'{font_size}') + 8)
-        self.header.setFont(font)
-        self.header.setAlignment(QtCore.Qt.AlignCenter)
-        self.header.setObjectName("header")
-        self.gridLayout_8.addWidget(self.header, 0, 0, 1, 1)
-        self.XML_type_label = QtWidgets.QLabel(experimentalist_window)
-        font = QtGui.QFont()
-        font.setPointSize(int(f'{font_size}'))
-        self.XML_type_label.setFont(font)
-        self.XML_type_label.setTextFormat(QtCore.Qt.AutoText)
-        self.XML_type_label.setScaledContents(False)
-        self.XML_type_label.setAlignment(QtCore.Qt.AlignCenter)
-        self.XML_type_label.setObjectName("XML_type_label")
-        self.gridLayout_8.addWidget(self.XML_type_label, 1, 0, 1, 1)
-        self.verticalLayout_2.addLayout(self.gridLayout_8)
-        self.tabWidget = QtWidgets.QTabWidget(experimentalist_window)
-        sizePolicy = QtWidgets.QSizePolicy(QtWidgets.QSizePolicy.Preferred, QtWidgets.QSizePolicy.Preferred)
-        sizePolicy.setHorizontalStretch(0)
-        sizePolicy.setVerticalStretch(0)
-        sizePolicy.setHeightForWidth(self.tabWidget.sizePolicy().hasHeightForWidth())
-        self.tabWidget.setSizePolicy(sizePolicy)
-        self.tabWidget.setLocale(QtCore.QLocale(QtCore.QLocale.English, QtCore.QLocale.UnitedStates))
-        self.tabWidget.setTabShape(QtWidgets.QTabWidget.Rounded)
-        self.tabWidget.setObjectName("tabWidget")
-        self.tab = QtWidgets.QWidget()
-        self.tab.setObjectName("tab")
-        self.gridLayout = QtWidgets.QGridLayout(self.tab)
-        self.gridLayout.setObjectName("gridLayout")
-        self.label_7 = QtWidgets.QLabel(self.tab)
-        font = QtGui.QFont()
-        font.setPointSize(int(f'{font_size}'))
-        self.label_7.setFont(font)
-        self.label_7.setObjectName("label_7")
-        self.gridLayout.addWidget(self.label_7, 5, 0, 1, 1)
-        self.label_6 = QtWidgets.QLabel(self.tab)
-        font = QtGui.QFont()
-        font.setPointSize(int(f'{font_size}'))
-        self.label_6.setFont(font)
-        self.label_6.setObjectName("label_6")
-        self.gridLayout.addWidget(self.label_6, 3, 0, 1, 1)
-        self.first_name = QtWidgets.QLineEdit(self.tab)
-        font = QtGui.QFont()
-        font.setPointSize(int(f'{font_size}'))
-        self.first_name.setFont(font)
-        self.first_name.setStyleSheet("border-color: rgb(255, 85, 0);")
-        self.first_name.setObjectName("first_name")
-        self.gridLayout.addWidget(self.first_name, 2, 0, 1, 1)
-        self.label_8 = QtWidgets.QLabel(self.tab)
-        font = QtGui.QFont()
-        font.setPointSize(int(f'{font_size}'))
-        self.label_8.setFont(font)
-        self.label_8.setObjectName("label_8")
-        self.gridLayout.addWidget(self.label_8, 7, 0, 1, 1)
-        self.email = QtWidgets.QLineEdit(self.tab)
-        font = QtGui.QFont()
-        font.setPointSize(int(f'{font_size}'))
-        self.email.setFont(font)
-        self.email.setObjectName("email")
-        self.gridLayout.addWidget(self.email, 6, 0, 1, 1)
-        self.label_21 = QtWidgets.QLabel(self.tab)
-        font = QtGui.QFont()
-        font.setPointSize(int(f'{font_size}') + 1)
-        self.label_21.setFont(font)
-        self.label_21.setObjectName("label_21")
-        self.gridLayout.addWidget(self.label_21, 0, 0, 1, 1)
-        self.label_5 = QtWidgets.QLabel(self.tab)
-        font = QtGui.QFont()
-        font.setPointSize(int(f'{font_size}'))
-        self.label_5.setFont(font)
-        self.label_5.setToolTip("")
-        self.label_5.setObjectName("label_5")
-        self.gridLayout.addWidget(self.label_5, 1, 0, 1, 1)
-        self.family_name = QtWidgets.QLineEdit(self.tab)
-        font = QtGui.QFont()
-        font.setPointSize(int(f'{font_size}'))
-        self.family_name.setFont(font)
-        self.family_name.setObjectName("family_name")
-        self.gridLayout.addWidget(self.family_name, 4, 0, 1, 1)
-        self.phone = QtWidgets.QLineEdit(self.tab)
-        font = QtGui.QFont()
-        font.setPointSize(int(f'{font_size}'))
-        self.phone.setFont(font)
-        self.phone.setObjectName("phone")
-        self.gridLayout.addWidget(self.phone, 8, 0, 1, 1)
-        self.label_9 = QtWidgets.QLabel(self.tab)
-        font = QtGui.QFont()
-        font.setPointSize(int(f'{font_size}'))
-        self.label_9.setFont(font)
-        self.label_9.setObjectName("label_9")
-        self.gridLayout.addWidget(self.label_9, 9, 0, 1, 1)
-        self.comments_contact = QtWidgets.QTextEdit(self.tab)
-        self.comments_contact.setMaximumSize(QtCore.QSize(16777215, 150))
-        font = QtGui.QFont()
-        font.setPointSize(int(f'{font_size}'))
-        self.comments_contact.setFont(font)
-        self.comments_contact.setOverwriteMode(True)
-        self.comments_contact.setTabStopWidth(80)
-        self.comments_contact.setObjectName("comments_contact")
-        self.gridLayout.addWidget(self.comments_contact, 10, 0, 1, 1)
-        self.tabWidget.addTab(self.tab, "")
-        self.tab_2 = QtWidgets.QWidget()
-        self.tab_2.setObjectName("tab_2")
-        self.gridLayout_2 = QtWidgets.QGridLayout(self.tab_2)
-        self.gridLayout_2.setObjectName("gridLayout_2")
-        self.label_ISNI = QtWidgets.QLabel(self.tab_2)
-        font = QtGui.QFont()
-        font.setPointSize(int(f'{font_size}'))
-        self.label_ISNI.setFont(font)
-        self.label_ISNI.setObjectName("label_ISNI")
-        self.gridLayout_2.addWidget(self.label_ISNI, 3, 0, 1, 1, QtCore.Qt.AlignBottom)
-        self.label_ResearcherID = QtWidgets.QLabel(self.tab_2)
-        font = QtGui.QFont()
-        font.setPointSize(int(f'{font_size}'))
-        self.label_ResearcherID.setFont(font)
-        self.label_ResearcherID.setObjectName("label_ResearcherID")
-        self.gridLayout_2.addWidget(self.label_ResearcherID, 5, 0, 1, 1, QtCore.Qt.AlignBottom)
-        self.ORCID = QtWidgets.QLineEdit(self.tab_2)
-        font = QtGui.QFont()
-        font.setPointSize(int(f'{font_size}'))
-        self.ORCID.setFont(font)
-        self.ORCID.setObjectName("ORCID")
-        self.gridLayout_2.addWidget(self.ORCID, 2, 0, 1, 1, QtCore.Qt.AlignTop)
-        self.label_ORCIDE = QtWidgets.QLabel(self.tab_2)
-        font = QtGui.QFont()
-        font.setPointSize(int(f'{font_size}'))
-        self.label_ORCIDE.setFont(font)
-        self.label_ORCIDE.setObjectName("label_ORCIDE")
-        self.gridLayout_2.addWidget(self.label_ORCIDE, 1, 0, 1, 1, QtCore.Qt.AlignBottom)
-        self.ISNI = QtWidgets.QLineEdit(self.tab_2)
-        font = QtGui.QFont()
-        font.setPointSize(int(f'{font_size}'))
-        self.ISNI.setFont(font)
-        self.ISNI.setObjectName("ISNI")
-        self.gridLayout_2.addWidget(self.ISNI, 4, 0, 1, 1, QtCore.Qt.AlignTop)
-        self.label_22 = QtWidgets.QLabel(self.tab_2)
-        font = QtGui.QFont()
-        font.setPointSize(int(f'{font_size}') + 1)
-        self.label_22.setFont(font)
-        self.label_22.setObjectName("label_22")
-        self.gridLayout_2.addWidget(self.label_22, 0, 0, 1, 1, QtCore.Qt.AlignTop)
-        self.ResearcherID = QtWidgets.QLineEdit(self.tab_2)
-        font = QtGui.QFont()
-        font.setPointSize(int(f'{font_size}'))
-        self.ResearcherID.setFont(font)
-        self.ResearcherID.setObjectName("ResearcherID")
-        self.gridLayout_2.addWidget(self.ResearcherID, 6, 0, 1, 1, QtCore.Qt.AlignTop)
-        self.ScopusAuthorID = QtWidgets.QLineEdit(self.tab_2)
-        font = QtGui.QFont()
-        font.setPointSize(int(f'{font_size}'))
-        self.ScopusAuthorID.setFont(font)
-        self.ScopusAuthorID.setObjectName("ScopusAuthorID")
-        self.gridLayout_2.addWidget(self.ScopusAuthorID, 8, 0, 1, 1, QtCore.Qt.AlignTop)
-        self.label_ScopusAuthorID = QtWidgets.QLabel(self.tab_2)
-        font = QtGui.QFont()
-        font.setPointSize(int(f'{font_size}'))
-        self.label_ScopusAuthorID.setFont(font)
-        self.label_ScopusAuthorID.setObjectName("label_ScopusAuthorID")
-        self.gridLayout_2.addWidget(self.label_ScopusAuthorID, 7, 0, 1, 1, QtCore.Qt.AlignBottom)
-        spacerItem = QtWidgets.QSpacerItem(20, 40, QtWidgets.QSizePolicy.Minimum, QtWidgets.QSizePolicy.Expanding)
-        self.gridLayout_2.addItem(spacerItem, 9, 0, 1, 1)
-        self.tabWidget.addTab(self.tab_2, "")
-        self.tab_3 = QtWidgets.QWidget()
-        self.tab_3.setObjectName("tab_3")
-        self.verticalLayout = QtWidgets.QVBoxLayout(self.tab_3)
-        self.verticalLayout.setObjectName("verticalLayout")
-        self.label = QtWidgets.QLabel(self.tab_3)
-        font = QtGui.QFont()
-        font.setPointSize(int(f'{font_size}') + 1)
-        self.label.setFont(font)
-        self.label.setObjectName("label")
-        self.verticalLayout.addWidget(self.label)
-        self.label_23 = QtWidgets.QLabel(self.tab_3)
-        self.label_23.setObjectName("label_23")
-        self.verticalLayout.addWidget(self.label_23)
-        self.gridLayout_5 = QtWidgets.QGridLayout()
-        self.gridLayout_5.setObjectName("gridLayout_5")
-        self.link_name_1 = QtWidgets.QLineEdit(self.tab_3)
-        font = QtGui.QFont()
-        font.setPointSize(int(f'{font_size}'))
-        self.link_name_1.setFont(font)
-        self.link_name_1.setObjectName("link_name_1")
-        self.gridLayout_5.addWidget(self.link_name_1, 0, 1, 1, 1)
-        self.label_10 = QtWidgets.QLabel(self.tab_3)
-        font = QtGui.QFont()
-        font.setPointSize(int(f'{font_size}') - 2)
-        self.label_10.setFont(font)
-        self.label_10.setObjectName("label_10")
-        self.gridLayout_5.addWidget(self.label_10, 0, 0, 1, 1)
-        self.label_11 = QtWidgets.QLabel(self.tab_3)
-        self.label_11.setMinimumSize(QtCore.QSize(0, 0))
-        self.label_11.setMaximumSize(QtCore.QSize(16777215, 16777215))
-        font = QtGui.QFont()
-        font.setPointSize(int(f'{font_size}') - 2)
-        self.label_11.setFont(font)
-        self.label_11.setObjectName("label_11")
-        self.gridLayout_5.addWidget(self.label_11, 1, 0, 1, 1)
-        self.link_url_1 = QtWidgets.QLineEdit(self.tab_3)
-        font = QtGui.QFont()
-        font.setPointSize(int(f'{font_size}'))
-        self.link_url_1.setFont(font)
-        self.link_url_1.setObjectName("link_url_1")
-        self.gridLayout_5.addWidget(self.link_url_1, 1, 1, 1, 1)
-        self.verticalLayout.addLayout(self.gridLayout_5)
-        self.label_2 = QtWidgets.QLabel(self.tab_3)
-        font = QtGui.QFont()
-        font.setPointSize(int(f'{font_size}'))
-        self.label_2.setFont(font)
-        self.label_2.setObjectName("label_2")
-        self.verticalLayout.addWidget(self.label_2)
-        self.gridLayout_3 = QtWidgets.QGridLayout()
-        self.gridLayout_3.setObjectName("gridLayout_3")
-        self.label_12 = QtWidgets.QLabel(self.tab_3)
-        font = QtGui.QFont()
-        font.setPointSize(int(f'{font_size}') - 2)
-        self.label_12.setFont(font)
-        self.label_12.setObjectName("label_12")
-        self.gridLayout_3.addWidget(self.label_12, 0, 0, 1, 1)
-        self.link_name_2 = QtWidgets.QLineEdit(self.tab_3)
-        font = QtGui.QFont()
-        font.setPointSize(int(f'{font_size}'))
-        self.link_name_2.setFont(font)
-        self.link_name_2.setObjectName("link_name_2")
-        self.gridLayout_3.addWidget(self.link_name_2, 0, 1, 1, 1)
-        self.label_13 = QtWidgets.QLabel(self.tab_3)
-        self.label_13.setMinimumSize(QtCore.QSize(0, 0))
-        self.label_13.setMaximumSize(QtCore.QSize(16777215, 16777215))
-        font = QtGui.QFont()
-        font.setPointSize(int(f'{font_size}') - 2)
-        self.label_13.setFont(font)
-        self.label_13.setObjectName("label_13")
-        self.gridLayout_3.addWidget(self.label_13, 1, 0, 1, 1)
-        self.link_url_2 = QtWidgets.QLineEdit(self.tab_3)
-        font = QtGui.QFont()
-        font.setPointSize(int(f'{font_size}'))
-        self.link_url_2.setFont(font)
-        self.link_url_2.setObjectName("link_url_2")
-        self.gridLayout_3.addWidget(self.link_url_2, 1, 1, 1, 1)
-        self.verticalLayout.addLayout(self.gridLayout_3)
-        self.label_3 = QtWidgets.QLabel(self.tab_3)
-        font = QtGui.QFont()
-        font.setPointSize(int(f'{font_size}'))
-        self.label_3.setFont(font)
-        self.label_3.setObjectName("label_3")
-        self.verticalLayout.addWidget(self.label_3)
-        self.gridLayout_6 = QtWidgets.QGridLayout()
-        self.gridLayout_6.setObjectName("gridLayout_6")
-        self.label_14 = QtWidgets.QLabel(self.tab_3)
-        font = QtGui.QFont()
-        font.setPointSize(int(f'{font_size}') - 2)
-        self.label_14.setFont(font)
-        self.label_14.setObjectName("label_14")
-        self.gridLayout_6.addWidget(self.label_14, 0, 0, 1, 1)
-        self.link_name_3 = QtWidgets.QLineEdit(self.tab_3)
-        font = QtGui.QFont()
-        font.setPointSize(int(f'{font_size}'))
-        self.link_name_3.setFont(font)
-        self.link_name_3.setObjectName("link_name_3")
-        self.gridLayout_6.addWidget(self.link_name_3, 0, 1, 1, 1)
-        self.label_15 = QtWidgets.QLabel(self.tab_3)
-        self.label_15.setMinimumSize(QtCore.QSize(0, 0))
-        self.label_15.setMaximumSize(QtCore.QSize(16777215, 16777215))
-        font = QtGui.QFont()
-        font.setPointSize(int(f'{font_size}') - 2)
-        self.label_15.setFont(font)
-        self.label_15.setObjectName("label_15")
-        self.gridLayout_6.addWidget(self.label_15, 1, 0, 1, 1)
-        self.link_url_3 = QtWidgets.QLineEdit(self.tab_3)
-        font = QtGui.QFont()
-        font.setPointSize(int(f'{font_size}'))
-        self.link_url_3.setFont(font)
-        self.link_url_3.setObjectName("link_url_3")
-        self.gridLayout_6.addWidget(self.link_url_3, 1, 1, 1, 1)
-        self.verticalLayout.addLayout(self.gridLayout_6)
-        self.label_4 = QtWidgets.QLabel(self.tab_3)
-        font = QtGui.QFont()
-        font.setPointSize(int(f'{font_size}'))
-        self.label_4.setFont(font)
-        self.label_4.setObjectName("label_4")
-        self.verticalLayout.addWidget(self.label_4)
-        self.gridLayout_7 = QtWidgets.QGridLayout()
-        self.gridLayout_7.setObjectName("gridLayout_7")
-        self.label_16 = QtWidgets.QLabel(self.tab_3)
-        font = QtGui.QFont()
-        font.setPointSize(int(f'{font_size}') - 2)
-        self.label_16.setFont(font)
-        self.label_16.setObjectName("label_16")
-        self.gridLayout_7.addWidget(self.label_16, 0, 0, 1, 1)
-        self.link_name_4 = QtWidgets.QLineEdit(self.tab_3)
-        font = QtGui.QFont()
-        font.setPointSize(int(f'{font_size}'))
-        self.link_name_4.setFont(font)
-        self.link_name_4.setObjectName("link_name_4")
-        self.gridLayout_7.addWidget(self.link_name_4, 0, 1, 1, 1)
-        self.label_17 = QtWidgets.QLabel(self.tab_3)
-        self.label_17.setMinimumSize(QtCore.QSize(0, 0))
-        self.label_17.setMaximumSize(QtCore.QSize(16777215, 16777215))
-        font = QtGui.QFont()
-        font.setPointSize(int(f'{font_size}') - 2)
-        self.label_17.setFont(font)
-        self.label_17.setObjectName("label_17")
-        self.gridLayout_7.addWidget(self.label_17, 1, 0, 1, 1)
-        self.link_url_4 = QtWidgets.QLineEdit(self.tab_3)
-        font = QtGui.QFont()
-        font.setPointSize(int(f'{font_size}'))
-        self.link_url_4.setFont(font)
-        self.link_url_4.setObjectName("link_url_4")
-        self.gridLayout_7.addWidget(self.link_url_4, 1, 1, 1, 1)
-        self.verticalLayout.addLayout(self.gridLayout_7)
-        self.tabWidget.addTab(self.tab_3, "")
-        self.tab_4 = QtWidgets.QWidget()
-        self.tab_4.setObjectName("tab_4")
-        self.gridLayout_4 = QtWidgets.QGridLayout(self.tab_4)
-        self.gridLayout_4.setObjectName("gridLayout_4")
-        self.label_18 = QtWidgets.QLabel(self.tab_4)
-        font = QtGui.QFont()
-        font.setPointSize(int(f'{font_size}') - 2)
-        self.label_18.setFont(font)
-        self.label_18.setObjectName("label_18")
-        self.gridLayout_4.addWidget(self.label_18, 1, 0, 1, 1)
-        self.c_lab_btn_1 = QtWidgets.QPushButton(self.tab_4)
-        font = QtGui.QFont()
-        font.setPointSize(int(f'{font_size}'))
-        self.c_lab_btn_1.setFont(font)
-        self.c_lab_btn_1.setObjectName("c_lab_btn_1")
-        self.gridLayout_4.addWidget(self.c_lab_btn_1, 2, 0, 1, 1)
-        spacerItem1 = QtWidgets.QSpacerItem(20, 40, QtWidgets.QSizePolicy.Minimum, QtWidgets.QSizePolicy.Expanding)
-        self.gridLayout_4.addItem(spacerItem1, 6, 0, 1, 1)
-        self.c_lab_btn_3 = QtWidgets.QPushButton(self.tab_4)
-        font = QtGui.QFont()
-        font.setPointSize(int(f'{font_size}'))
-        self.c_lab_btn_3.setFont(font)
-        self.c_lab_btn_3.setObjectName("c_lab_btn_3")
-        self.gridLayout_4.addWidget(self.c_lab_btn_3, 4, 0, 1, 1)
-        self.c_lab_btn_2 = QtWidgets.QPushButton(self.tab_4)
-        font = QtGui.QFont()
-        font.setPointSize(int(f'{font_size}'))
-        self.c_lab_btn_2.setFont(font)
-        self.c_lab_btn_2.setObjectName("c_lab_btn_2")
-        self.gridLayout_4.addWidget(self.c_lab_btn_2, 3, 0, 1, 1)
-        self.c_lab_btn_4 = QtWidgets.QPushButton(self.tab_4)
-        font = QtGui.QFont()
-        font.setPointSize(int(f'{font_size}'))
-        self.c_lab_btn_4.setFont(font)
-        self.c_lab_btn_4.setObjectName("c_lab_btn_4")
-        self.gridLayout_4.addWidget(self.c_lab_btn_4, 5, 0, 1, 1)
-        self.label_24 = QtWidgets.QLabel(self.tab_4)
-        font = QtGui.QFont()
-        font.setPointSize(int(f'{font_size}') + 1)
-        self.label_24.setFont(font)
-        self.label_24.setObjectName("label_24")
-        self.gridLayout_4.addWidget(self.label_24, 0, 0, 1, 1)
-        self.tabWidget.addTab(self.tab_4, "")
-        self.tab_5 = QtWidgets.QWidget()
-        self.tab_5.setObjectName("tab_5")
-        self.verticalLayout_7 = QtWidgets.QVBoxLayout(self.tab_5)
-        self.verticalLayout_7.setObjectName("verticalLayout_7")
-        self.label_25 = QtWidgets.QLabel(self.tab_5)
-        font = QtGui.QFont()
-        font.setPointSize(int(f'{font_size}') + 1)
-        self.label_25.setFont(font)
-        self.label_25.setObjectName("label_25")
-        self.verticalLayout_7.addWidget(self.label_25)
-        self.label_19 = QtWidgets.QLabel(self.tab_5)
-        font = QtGui.QFont()
-        font.setPointSize(int(f'{font_size}') - 2)
-        self.label_19.setFont(font)
-        self.label_19.setObjectName("label_19")
-        self.verticalLayout_7.addWidget(self.label_19)
-        self.p_lab_btn_1 = QtWidgets.QPushButton(self.tab_5)
-        font = QtGui.QFont()
-        font.setPointSize(int(f'{font_size}'))
-        self.p_lab_btn_1.setFont(font)
-        self.p_lab_btn_1.setObjectName("p_lab_btn_1")
-        self.verticalLayout_7.addWidget(self.p_lab_btn_1)
-        self.p_lab_btn_2 = QtWidgets.QPushButton(self.tab_5)
-        font = QtGui.QFont()
-        font.setPointSize(int(f'{font_size}'))
-        self.p_lab_btn_2.setFont(font)
-        self.p_lab_btn_2.setObjectName("p_lab_btn_2")
-        self.verticalLayout_7.addWidget(self.p_lab_btn_2)
-        self.p_lab_btn_3 = QtWidgets.QPushButton(self.tab_5)
-        font = QtGui.QFont()
-        font.setPointSize(int(f'{font_size}'))
-        self.p_lab_btn_3.setFont(font)
-        self.p_lab_btn_3.setObjectName("p_lab_btn_3")
-        self.verticalLayout_7.addWidget(self.p_lab_btn_3)
-        self.p_lab_btn_4 = QtWidgets.QPushButton(self.tab_5)
-        font = QtGui.QFont()
-        font.setPointSize(int(f'{font_size}'))
-        self.p_lab_btn_4.setFont(font)
-        self.p_lab_btn_4.setObjectName("p_lab_btn_4")
-        self.verticalLayout_7.addWidget(self.p_lab_btn_4)
-        self.p_lab_btn_5 = QtWidgets.QPushButton(self.tab_5)
-        font = QtGui.QFont()
-        font.setPointSize(int(f'{font_size}'))
-        self.p_lab_btn_5.setFont(font)
-        self.p_lab_btn_5.setObjectName("p_lab_btn_5")
-        self.verticalLayout_7.addWidget(self.p_lab_btn_5)
-        self.p_lab_btn_6 = QtWidgets.QPushButton(self.tab_5)
-        font = QtGui.QFont()
-        font.setPointSize(int(f'{font_size}'))
-        self.p_lab_btn_6.setFont(font)
-        self.p_lab_btn_6.setObjectName("p_lab_btn_6")
-        self.verticalLayout_7.addWidget(self.p_lab_btn_6)
-        spacerItem2 = QtWidgets.QSpacerItem(20, 40, QtWidgets.QSizePolicy.Minimum, QtWidgets.QSizePolicy.Expanding)
-        self.verticalLayout_7.addItem(spacerItem2)
-        self.tabWidget.addTab(self.tab_5, "")
-        self.verticalLayout_2.addWidget(self.tabWidget)
-        self.label_20 = QtWidgets.QLabel(experimentalist_window)
-        font = QtGui.QFont()
-        font.setPointSize(int(f'{font_size}') - 2)
-        self.label_20.setFont(font)
-        self.label_20.setObjectName("label_20")
-        self.verticalLayout_2.addWidget(self.label_20)
-        self.buttonBox = QtWidgets.QPushButton(experimentalist_window)
-        self.buttonBox.setObjectName("buttonBox")
-        self.verticalLayout_2.addWidget(self.buttonBox)
-
-        self.retranslateUi(experimentalist_window)
-        self.tabWidget.setCurrentIndex(0)
-        QtCore.QMetaObject.connectSlotsByName(experimentalist_window)
-        experimentalist_window.setTabOrder(self.first_name, self.family_name)
-        experimentalist_window.setTabOrder(self.family_name, self.email)
-        experimentalist_window.setTabOrder(self.email, self.phone)
-        experimentalist_window.setTabOrder(self.phone, self.comments_contact)
-        experimentalist_window.setTabOrder(self.comments_contact, self.ORCID)
-        experimentalist_window.setTabOrder(self.ORCID, self.ISNI)
-        experimentalist_window.setTabOrder(self.ISNI, self.ResearcherID)
-        experimentalist_window.setTabOrder(self.ResearcherID, self.ScopusAuthorID)
-        experimentalist_window.setTabOrder(self.ScopusAuthorID, self.link_name_1)
-        experimentalist_window.setTabOrder(self.link_name_1, self.link_url_1)
-        experimentalist_window.setTabOrder(self.link_url_1, self.link_name_2)
-        experimentalist_window.setTabOrder(self.link_name_2, self.link_url_2)
-        experimentalist_window.setTabOrder(self.link_url_2, self.link_name_3)
-        experimentalist_window.setTabOrder(self.link_name_3, self.link_url_3)
-        experimentalist_window.setTabOrder(self.link_url_3, self.link_name_4)
-        experimentalist_window.setTabOrder(self.link_name_4, self.link_url_4)
-        experimentalist_window.setTabOrder(self.link_url_4, self.c_lab_btn_1)
-        experimentalist_window.setTabOrder(self.c_lab_btn_1, self.c_lab_btn_2)
-        experimentalist_window.setTabOrder(self.c_lab_btn_2, self.c_lab_btn_3)
-        experimentalist_window.setTabOrder(self.c_lab_btn_3, self.c_lab_btn_4)
-        experimentalist_window.setTabOrder(self.c_lab_btn_4, self.p_lab_btn_1)
-        experimentalist_window.setTabOrder(self.p_lab_btn_1, self.p_lab_btn_2)
-        experimentalist_window.setTabOrder(self.p_lab_btn_2, self.p_lab_btn_3)
-        experimentalist_window.setTabOrder(self.p_lab_btn_3, self.p_lab_btn_4)
-        experimentalist_window.setTabOrder(self.p_lab_btn_4, self.p_lab_btn_5)
-        experimentalist_window.setTabOrder(self.p_lab_btn_5, self.p_lab_btn_6)
-        experimentalist_window.setTabOrder(self.p_lab_btn_6, self.buttonBox)
-
-    def retranslateUi(self, experimentalist_window):
-        _translate = QtCore.QCoreApplication.translate
-        experimentalist_window.setWindowTitle(_translate("experimentalist_window",
-                                                         "SSHADE Experimentalist XML template"))
-        self.about_btn.setText(_translate("experimentalist_window", "?"))
-        self.header.setText(_translate("experimentalist_window", "SSHADE XML generator"))
-        self.XML_type_label.setText(_translate("experimentalist_window",
-                                               "<html><head/><body><p>Experimentalist template</p></body></html>"))
-        self.label_7.setText(_translate("experimentalist_window", "Email *"))
-        self.label_6.setText(_translate("experimentalist_window", "Family name **"))
-        self.first_name.setToolTip(_translate("experimentalist_window",
-                                              "<html><head/><body><p>Experimentalist First (Given) name</p>"
-                                              "</body></html>"))
-        self.first_name.setWhatsThis(_translate("experimentalist_window",
-                                                "<html><head/><body><p><br/></p></body></html>"))
-        self.label_8.setText(_translate("experimentalist_window", "Phone"))
-        self.email.setToolTip(_translate("experimentalist_window",
-                                         "<html><head/><body>Experimentalist Email</body></html>"))
-        self.label_21.setText(_translate("experimentalist_window", "Experimentalist\'s information"))
-        self.label_5.setText(_translate("experimentalist_window", "First name **"))
-        self.family_name.setToolTip(_translate("experimentalist_window",
-                                               "<html><head/><body>Experimentalist Family (Last) name</body></html>"))
-        self.phone.setToolTip(_translate("experimentalist_window",
-                                         "<html><head/><body>Experimental phone in international format</body></html>"))
-        self.label_9.setText(_translate("experimentalist_window", "Any additional information"))
-        self.comments_contact.setToolTip(_translate("experimentalist_window",
-                                                    "<html><head/><body>"
-                                                    "<p>Any additional information about the experimentalist</p>"
-                                                    "</body></html>"))
-        self.tabWidget.setTabText(self.tabWidget.indexOf(self.tab), _translate("experimentalist_window", "1 Info"))
-        self.label_ISNI.setText(_translate("experimentalist_window", "ISNI"))
-        self.label_ResearcherID.setText(_translate("experimentalist_window", "Researcher ID"))
-        self.ORCID.setToolTip(_translate("experimentalist_window",
-                                         "<html><head/><body>"
-                                         "<p>Experimentalist ORCID, Open Researcher and Contributor ID, if available</p>"
-                                         "</body></html>"))
-        self.label_ORCIDE.setText(_translate("experimentalist_window", "ORCID identifier *"))
-        self.ISNI.setToolTip(_translate("experimentalist_window",
-                                        "<html><head/><body>"
-                                        "<p>Experimentalist ISNI (International Standard Name Identifier) if available</p>"
-                                        "</body></html>"))
-        self.label_22.setText(_translate("experimentalist_window", "Experimentalist\'s identifiers"))
-        self.ResearcherID.setToolTip(_translate("experimentalist_window",
-                                                "<html><head/><body><p>Experimentalist Researcher ID if available</p>"
-                                                "</body></html>"))
-        self.ScopusAuthorID.setToolTip(_translate("experimentalist_window",
-                                                  "<html><head/><body>"
-                                                  "<p>Experimentalist Scopus Author ID if available</p></body></html>"))
-        self.label_ScopusAuthorID.setText(_translate("experimentalist_window", "Scopus Author ID"))
-        self.tabWidget.setTabText(self.tabWidget.indexOf(self.tab_2), _translate("experimentalist_window", "2 Idents"))
-        self.label.setText(_translate("experimentalist_window", "Experimentalist professional web page"))
-        self.label_23.setText(_translate("experimentalist_window", "Experimentalist\'s web page(s)"))
-        self.link_name_1.setToolTip(_translate("experimentalist_window",
-                                               "<html><head/><body>"
-                                               "<p>Web page title, i.e. John Doe\'s professional web page</p>"
-                                               "</body></html>"))
-        self.label_10.setText(_translate("experimentalist_window", "name"))
-        self.label_11.setText(_translate("experimentalist_window", "URL "))
-        self.link_url_1.setToolTip(_translate("experimentalist_window",
-                                              "<html><head/><body><p>web address of the page</p></body></html>"))
-        self.label_2.setText(_translate("experimentalist_window", "Experimentalist personal web page"))
-        self.label_12.setText(_translate("experimentalist_window", "name"))
-        self.link_name_2.setToolTip(_translate("experimentalist_window",
-                                               "<html><head/><body>"
-                                               "<p>Web page title, i.e. John Doe\'s strange science</p></body></html>"))
-        self.label_13.setText(_translate("experimentalist_window", "URL "))
-        self.link_url_2.setToolTip(_translate("experimentalist_window",
-                                              "<html><head/><body><p>web address of the page</p></body></html>"))
-        self.label_3.setText(_translate("experimentalist_window", "Other web page (project, ...)"))
-        self.label_14.setText(_translate("experimentalist_window", "name"))
-        self.link_name_3.setToolTip(_translate("experimentalist_window",
-                                               "<html><head/><body>"
-                                               "<p>Web page title, i.e. John Doe\'s Gray Matter project</p>"
-                                               "</body></html>"))
-        self.label_15.setText(_translate("experimentalist_window", "URL "))
-        self.link_url_3.setToolTip(_translate("experimentalist_window",
-                                              "<html><head/><body><p>web address of the page</p></body></html>"))
-        self.label_4.setText(_translate("experimentalist_window", "Other web page (ResearchGate, LinkedIn, ...)"))
-        self.label_16.setText(_translate("experimentalist_window", "name"))
-        self.link_name_4.setToolTip(_translate("experimentalist_window",
-                                               "<html><head/><body>"
-                                               "<p>Web page title, i.e. John Doe\'s LinkedIn page</p></body></html>"))
-        self.label_17.setText(_translate("experimentalist_window", "URL "))
-        self.link_url_4.setToolTip(_translate("experimentalist_window",
-                                              "<html><head/><body><p>web address of the page</p></body></html>"))
-        self.tabWidget.setTabText(self.tabWidget.indexOf(self.tab_3), _translate("experimentalist_window", "3 Links"))
-        self.label_18.setText(_translate("experimentalist_window",
-                                         "Please, provide all laboratories in which you are currently affiliated. \n"
-                                         "At least one laboratory must be given"))
-        self.c_lab_btn_1.setToolTip(_translate("experimentalist_window",
-                                               "<html><head/><body><p>Add a current laboratory</p></body></html>"))
-        self.c_lab_btn_1.setText(_translate("experimentalist_window", "Your main current laboratory"))
-        self.c_lab_btn_3.setToolTip(_translate("experimentalist_window",
-                                               "<html><head/><body>"
-                                               "<p>Add one more current laboratory</p></body></html>"))
-        self.c_lab_btn_3.setText(_translate("experimentalist_window", "Current Lab 3"))
-        self.c_lab_btn_2.setToolTip(_translate("experimentalist_window",
-                                               "<html><head/><body>"
-                                               "<p>Add another current laboratory</p></body></html>"))
-        self.c_lab_btn_2.setText(_translate("experimentalist_window", "Current Lab 2"))
-        self.c_lab_btn_4.setToolTip(_translate("experimentalist_window",
-                                               "<html><head/><body>"
-                                               "<p>Add one more current laboratory</p></body></html>"))
-        self.c_lab_btn_4.setText(_translate("experimentalist_window", "Current Lab 4"))
-        self.label_24.setText(_translate("experimentalist_window", "Experimentalist\'s current laboratories"))
-        self.tabWidget.setTabText(self.tabWidget.indexOf(self.tab_4), _translate("experimentalist_window", "4 Current"))
-        self.label_25.setText(_translate("experimentalist_window", "Experimentalist\'s previous laboratories"))
-        self.label_19.setText(_translate("experimentalist_window",
-                                         "Please, provide all your previously affiliated laboratories\n"
-                                         "in which you were producing lab data"))
-        self.p_lab_btn_1.setToolTip(_translate("experimentalist_window",
-                                               "<html><head/><body><p>Add a previous laboratory</p></body></html>"))
-        self.p_lab_btn_1.setText(_translate("experimentalist_window", "Previous Lab 1"))
-        self.p_lab_btn_2.setToolTip(_translate("experimentalist_window",
-                                               "<html><head/><body>"
-                                               "<p>Add another previous laboratory</p></body></html>"))
-        self.p_lab_btn_2.setText(_translate("experimentalist_window", "Previous Lab 2"))
-        self.p_lab_btn_3.setToolTip(_translate("experimentalist_window",
-                                               "<html><head/><body>"
-                                               "<p>Add one more previous laboratory</p></body></html>"))
-        self.p_lab_btn_3.setText(_translate("experimentalist_window", "Previous Lab 3"))
-        self.p_lab_btn_4.setToolTip(_translate("experimentalist_window",
-                                               "<html><head/><body>"
-                                               "<p>Add one more previous laboratory</p></body></html>"))
-        self.p_lab_btn_4.setText(_translate("experimentalist_window", "Previous Lab 4"))
-        self.p_lab_btn_5.setToolTip(_translate("experimentalist_window",
-                                               "<html><head/><body>"
-                                               "<p>Add one more previous laboratory</p></body></html>"))
-        self.p_lab_btn_5.setText(_translate("experimentalist_window", "Previous Lab 5"))
-        self.p_lab_btn_6.setToolTip(_translate("experimentalist_window",
-                                               "<html><head/><body>"
-                                               "<p>Add one more previous laboratory</p></body></html>"))
-        self.p_lab_btn_6.setText(_translate("experimentalist_window", "Previous Lab 6"))
-        self.tabWidget.setTabText(self.tabWidget.indexOf(self.tab_5),
-                                  _translate("experimentalist_window", "5 Previous"))
-        self.label_20.setText(_translate("experimentalist_window", "**: This information is mandatory\n"
-                                                                   "*: This information is recommended"))
-        self.buttonBox.setText(_translate("experimentalist_window", "Fill the XML template with this information"))
-
-
 # MAIN WINDOW class
-class XMLTemplateExperimentalist(QtWidgets.QDialog):
+class XMLTemplateExperimentalist(QtWidgets.QMainWindow):
     def __init__(self):
         super(XMLTemplateExperimentalist, self).__init__()
         self.ui = Ui_experimentalist_window()
@@ -667,6 +42,15 @@ class XMLTemplateExperimentalist(QtWidgets.QDialog):
         self.ui.family_name.setStyleSheet(
             'QLineEdit{border-width: 2px; border-style: solid; border-color: rgb(251,157,111); '
             'background-color: rgb(255,250,245); padding: 5px}')
+        # state
+        self.ui.state.setStyleSheet(
+            'QComboBox{border-width: 2px; border-style: solid; border-color: rgb(251,157,111); '
+            'background-color: rgb(255,250,245); padding: 5px}')
+        self.ui.state.insertItem(0, 'active')
+        self.ui.state.insertItem(1, 'inactive')
+        self.ui.state.insertItem(2, 'retired')
+        self.ui.state.insertItem(3, 'deceased')
+        self.ui.state.setCurrentIndex(0)
         # email
         self.ui.email.setStyleSheet(
             'QLineEdit{border-width: 2px; border-style: solid; border-color: rgb(240,200,41); '
@@ -734,6 +118,14 @@ class XMLTemplateExperimentalist(QtWidgets.QDialog):
         self.ui.p_lab_btn_6.setStyleSheet('QPushButton{padding: 5px}')
         # generate button
         self.ui.buttonBox.setStyleSheet('QPushButton{padding: 5px}')
+        # Menu
+        extractAction = QAction("&About", self)
+        extractAction.setStatusTip('About The App')
+        extractAction.triggered.connect(self.show_about)
+        self.statusBar()
+        mainMenu = self.menuBar()
+        fileMenu = mainMenu.addMenu('&Help')
+        fileMenu.addAction(extractAction)
         # SIGNALS & SLOTS
         # current labs
         self.ui.c_lab_btn_1.clicked.connect(self.add_current_lab_1)
@@ -749,12 +141,12 @@ class XMLTemplateExperimentalist(QtWidgets.QDialog):
         self.ui.p_lab_btn_6.clicked.connect(self.add_previous_lab_6)
         # main fill button
         self.ui.buttonBox.clicked.connect(self.fill_XML)
-        # about button
-        self.ui.about_btn.clicked.connect(self.about_info)
 
-    def about_info(self):
+
+    def show_about(self):
         self.dialog_ok(f"<b>XML generator: experimentalist</b> v{__version__}"
                        f"<p>Copyright: {__copyright__}</p>"
+                       f"<p><a href='{__GitHub_repos__}'>GitHub repository</a> (program code and more information)</p>"
                        f"<p>Created by Gorbacheva Maria ({__author_mail__})</p>"
                        "<p>Scientific base by Bernard Schmitt, IPAG (bernard.schmitt@univ-grenoble-alpes.fr)</p>"
                        f"<p>For any questions and bug reports, please, mail at {__bug_support_mail__}</p>"
@@ -801,6 +193,21 @@ class XMLTemplateExperimentalist(QtWidgets.QDialog):
 
     def add_previous_lab_6(self):
         XMLTemplatePreviousLab(6)
+
+    # dialog windows
+    def dialog_ok(self, s):
+        dlg = QMessageBox(self)
+        dlg.setWindowTitle('Info')
+        dlg.setText(s)
+        dlg.setIcon(QMessageBox.Information)
+        dlg.show()
+
+    def dialog_critical(self, s):
+        dlg = QMessageBox(self)
+        dlg.setWindowTitle('Error!')
+        dlg.setText(s)
+        dlg.setIcon(QMessageBox.Critical)
+        dlg.show()
 
     # main fill button
     def fill_XML(self):
@@ -893,20 +300,43 @@ class XMLTemplateExperimentalist(QtWidgets.QDialog):
             return string_var
 
         # VERIFICATION of data & FILLING the XML template
+        verification_Ok = 1
+        # abs_mandatory
         if self.ui.first_name.text().strip() == '':
-            AbsMandatoryWarning('First name', '')
+            verification_Ok = 0
+            self.dialog_critical('First name is mandatory!')
             self.ui.tabWidget.setCurrentIndex(0)
             self.ui.first_name.setFocus()
         elif self.ui.family_name.text().strip() == '':
-            AbsMandatoryWarning('Family name', '')
+            verification_Ok = 0
+            self.dialog_critical('Family name is mandatory!')
             self.ui.tabWidget.setCurrentIndex(0)
             self.ui.family_name.setFocus()
         elif labs_current_data_array[0] == [] and labs_current_data_array[1] == [] and labs_current_data_array[2] == [] \
                 and labs_current_data_array[3] == []:
-            AbsMandatoryWarning('At least on current lab', '')
+            verification_Ok = 0
+            self.dialog_critical('At least on current lab is mandatory!')
             self.ui.tabWidget.setCurrentIndex(3)
             self.ui.c_lab_btn_1.setFocus()
-        else:
+        # mandatory
+        if verification_Ok and self.ui.email.text() == '':
+            reply = QMessageBox.question(self, 'Message',
+                                         "Are you sure to leave no email?", QMessageBox.Yes |
+                                         QMessageBox.No, QMessageBox.No)
+            if reply == QMessageBox.No:
+                verification_Ok = 0
+                self.ui.tabWidget.setCurrentIndex(0)
+                self.ui.email.setFocus()
+        if verification_Ok and self.ui.ORCID.text() == '':
+            reply = QMessageBox.question(self, 'Message',
+                                         "Are you sure to leave no ORCID?", QMessageBox.Yes |
+                                         QMessageBox.No, QMessageBox.No)
+            if reply == QMessageBox.No:
+                verification_Ok = 0
+                self.ui.tabWidget.setCurrentIndex(1)
+                self.ui.ORCID.setFocus()
+        # filling
+        if verification_Ok:
             # SORTING labs arrays
             # previous
             index_array_previous = []
@@ -1053,6 +483,9 @@ class XMLTemplateExperimentalist(QtWidgets.QDialog):
                                     if inner_item.tag == "{http://sshade.eu/schema/import}code":
                                         inner_item.clear()
                                         inner_item.text = ''
+                if child.tag == "{http://sshade.eu/schema/import}state":
+                    child.clear()
+                    child.text = self.ui.state.currentText()
                 if child.tag == "{http://sshade.eu/schema/import}links":
                     at_least_one_is_added = 0
                     if self.ui.link_name_1.text().strip() != "" and self.ui.link_url_1.text().strip() != "":
@@ -1370,105 +803,7 @@ class XMLTemplateExperimentalist(QtWidgets.QDialog):
                                                xml_declaration=True, method="xml")
                 with open(file_name, 'wb') as file_output:
                     file_output.write(str_to_upload)
-                SavingOK()
-
-
-# CURRENT labs window
-class Ui_CurrentLab(object):
-    def setupUi(self, CurrentLab):
-        CurrentLab.setObjectName("CurrentLab")
-        CurrentLab.resize(445, 359)
-        font = QtGui.QFont()
-        font.setPointSize(int(f'{font_size}'))
-        CurrentLab.setFont(font)
-        self.verticalLayout = QtWidgets.QVBoxLayout(CurrentLab)
-        self.verticalLayout.setObjectName("verticalLayout")
-        self.label_10 = QtWidgets.QLabel(CurrentLab)
-        font = QtGui.QFont()
-        font.setPointSize(int(f'{font_size}'))
-        self.label_10.setFont(font)
-        self.label_10.setObjectName("label_10")
-        self.verticalLayout.addWidget(self.label_10)
-        self.c_lab_acronym = QtWidgets.QLineEdit(CurrentLab)
-        font = QtGui.QFont()
-        font.setPointSize(int(f'{font_size}'))
-        self.c_lab_acronym.setFont(font)
-        self.c_lab_acronym.setObjectName("c_lab_acronym")
-        self.verticalLayout.addWidget(self.c_lab_acronym)
-        self.label = QtWidgets.QLabel(CurrentLab)
-        font = QtGui.QFont()
-        font.setPointSize(int(f'{font_size}'))
-        self.label.setFont(font)
-        self.label.setObjectName("label")
-        self.verticalLayout.addWidget(self.label)
-        self.c_status = QtWidgets.QComboBox(CurrentLab)
-        font = QtGui.QFont()
-        font.setPointSize(int(f'{font_size}'))
-        self.c_status.setFont(font)
-        self.c_status.setObjectName("c_status")
-        self.verticalLayout.addWidget(self.c_status)
-        self.label_12 = QtWidgets.QLabel(CurrentLab)
-        font = QtGui.QFont()
-        font.setPointSize(int(f'{font_size}'))
-        self.label_12.setFont(font)
-        self.label_12.setObjectName("label_12")
-        self.verticalLayout.addWidget(self.label_12)
-        self.c_begin_date = QtWidgets.QDateEdit(CurrentLab)
-        font = QtGui.QFont()
-        font.setPointSize(int(f'{font_size}'))
-        self.c_begin_date.setFont(font)
-        self.c_begin_date.setObjectName("c_begin_date")
-        self.verticalLayout.addWidget(self.c_begin_date)
-        self.label_13 = QtWidgets.QLabel(CurrentLab)
-        font = QtGui.QFont()
-        font.setPointSize(int(f'{font_size}'))
-        self.label_13.setFont(font)
-        self.label_13.setObjectName("label_13")
-        self.verticalLayout.addWidget(self.label_13)
-        self.c_lab_comment = QtWidgets.QTextEdit(CurrentLab)
-        font = QtGui.QFont()
-        font.setPointSize(int(f'{font_size}'))
-        self.c_lab_comment.setFont(font)
-        self.c_lab_comment.setObjectName("c_lab_comment")
-        self.verticalLayout.addWidget(self.c_lab_comment)
-        self.horizontalLayout_2 = QtWidgets.QHBoxLayout()
-        self.horizontalLayout_2.setObjectName("horizontalLayout_2")
-        self.buttonBox = QtWidgets.QPushButton(CurrentLab)
-        self.buttonBox.setObjectName("buttonBox")
-        self.horizontalLayout_2.addWidget(self.buttonBox)
-        self.clear_btn = QtWidgets.QPushButton(CurrentLab)
-        self.clear_btn.setObjectName("clear_btn")
-        self.horizontalLayout_2.addWidget(self.clear_btn)
-        self.cancel_btn = QtWidgets.QPushButton(CurrentLab)
-        self.cancel_btn.setObjectName("cancel_btn")
-        self.horizontalLayout_2.addWidget(self.cancel_btn)
-        self.verticalLayout.addLayout(self.horizontalLayout_2)
-
-        self.retranslateUi(CurrentLab)
-        QtCore.QMetaObject.connectSlotsByName(CurrentLab)
-
-    def retranslateUi(self, CurrentLab):
-        _translate = QtCore.QCoreApplication.translate
-        CurrentLab.setWindowTitle(_translate("CurrentLab", "Current Lab 1"))
-        self.label_10.setText(_translate("CurrentLab", "Lab Acronym **"))
-        self.c_lab_acronym.setToolTip(_translate("CurrentLab",
-                                                 "<html><head/><body>"
-                                                 "<p>Experimentalist laboratory acronym</p></body></html>"))
-        self.label.setText(_translate("CurrentLab", "Status *"))
-        self.c_status.setToolTip(_translate("CurrentLab",
-                                            "<html><head/><body>"
-                                            "<p>Experimentalist\'s status in this laboratory</p></body></html>"))
-        self.label_12.setText(_translate("CurrentLab", "Beginning date **"))
-        self.c_begin_date.setToolTip(_translate("CurrentLab",
-                                                "<html><head/><body>"
-                                                "<p>Format: YYYY-MM-DD, beginning date of the experimentalist in this laboratory (<span style=\" font-weight:600;\">needed for DOI</span>)</p></body></html>"))
-        self.label_13.setText(_translate("CurrentLab", "Additional information"))
-        self.c_lab_comment.setToolTip(_translate("CurrentLab",
-                                                 "<html><head/><body>"
-                                                 "<p>Any additional information on this laboratory</p></body></html>"))
-        self.buttonBox.setText(_translate("CurrentLab", "Save and Close"))
-        self.clear_btn.setText(_translate("CurrentLab", "Clear this form"))
-        self.cancel_btn.setText(_translate("CurrentLab", "Close without change"))
+                self.dialog_ok('The XML was saved!')
 
 
 # CURRENT labs CLASS
@@ -1543,13 +878,26 @@ class XMLTemplateCurrentLab(QtWidgets.QDialog):
             labs_current_data_array[self.current_lab_edit - 1].clear()
 
     def add_current_lab_action(self):
+        verification_Ok = 1
+        # abd_mandatory
         if self.ui.c_lab_acronym.text().strip() == '':
-            AbsMandatoryWarning('Lab Acronym', '')
+            verification_Ok = 0
+            self.dialog_critical('Lab Acronym is mandatory!')
             self.ui.c_lab_acronym.setFocus()
         elif self.ui.c_begin_date.date().toString("yyyy-MM-dd") == '1900-01-01':
-            AbsMandatoryWarning('Beginning date', 'We need this for DOI')
+            verification_Ok = 0
+            self.dialog_critical('Beginning date is mandatory!\nWe need this for DOI')
             self.ui.c_begin_date.setFocus()
-        else:
+        # mandatory
+        if verification_Ok and self.ui.c_status.currentIndex() == 0:
+            reply = QMessageBox.question(self, 'Message',
+                                         "Are you sure to leave the status empty?", QMessageBox.Yes |
+                                         QMessageBox.No, QMessageBox.No)
+            if reply == QMessageBox.No:
+                verification_Ok = 0
+                self.ui.c_status.setFocus()
+        # creation or re-filling
+        if verification_Ok:
             if not labs_current_data_array[self.current_lab_edit - 1]:
                 labs_current_data_array[self.current_lab_edit - 1].append(self.ui.c_lab_acronym.text())
                 labs_current_data_array[self.current_lab_edit - 1].append(self.ui.c_status.currentIndex())
@@ -1566,119 +914,13 @@ class XMLTemplateCurrentLab(QtWidgets.QDialog):
                 labs_current_data_array[self.current_lab_edit - 1][4] = self.ui.c_lab_comment.toPlainText()
             self.close()
 
-
-# PREVIOUS labs template
-class Ui_PreviousLab(object):
-    def setupUi(self, PreviousLab):
-        PreviousLab.setObjectName("PreviousLab")
-        PreviousLab.resize(445, 420)
-        font = QtGui.QFont()
-        font.setPointSize(int(f'{font_size}'))
-        PreviousLab.setFont(font)
-        self.verticalLayout = QtWidgets.QVBoxLayout(PreviousLab)
-        self.verticalLayout.setObjectName("verticalLayout")
-        self.label_10 = QtWidgets.QLabel(PreviousLab)
-        font = QtGui.QFont()
-        font.setPointSize(int(f'{font_size}'))
-        self.label_10.setFont(font)
-        self.label_10.setObjectName("label_10")
-        self.verticalLayout.addWidget(self.label_10)
-        self.p_lab_acronym = QtWidgets.QLineEdit(PreviousLab)
-        font = QtGui.QFont()
-        font.setPointSize(int(f'{font_size}'))
-        self.p_lab_acronym.setFont(font)
-        self.p_lab_acronym.setObjectName("p_lab_acronym")
-        self.verticalLayout.addWidget(self.p_lab_acronym)
-        self.label_2 = QtWidgets.QLabel(PreviousLab)
-        font = QtGui.QFont()
-        font.setPointSize(int(f'{font_size}'))
-        self.label_2.setFont(font)
-        self.label_2.setObjectName("label_2")
-        self.verticalLayout.addWidget(self.label_2)
-        self.p_status = QtWidgets.QComboBox(PreviousLab)
-        font = QtGui.QFont()
-        font.setPointSize(int(f'{font_size}'))
-        self.p_status.setFont(font)
-        self.p_status.setObjectName("p_status")
-        self.verticalLayout.addWidget(self.p_status)
-        self.label_12 = QtWidgets.QLabel(PreviousLab)
-        font = QtGui.QFont()
-        font.setPointSize(int(f'{font_size}'))
-        self.label_12.setFont(font)
-        self.label_12.setObjectName("label_12")
-        self.verticalLayout.addWidget(self.label_12)
-        self.p_begin_date = QtWidgets.QDateEdit(PreviousLab)
-        font = QtGui.QFont()
-        font.setPointSize(int(f'{font_size}'))
-        self.p_begin_date.setFont(font)
-        self.p_begin_date.setObjectName("p_begin_date")
-        self.verticalLayout.addWidget(self.p_begin_date)
-        self.label = QtWidgets.QLabel(PreviousLab)
-        font = QtGui.QFont()
-        font.setPointSize(int(f'{font_size}'))
-        self.label.setFont(font)
-        self.label.setObjectName("label")
-        self.verticalLayout.addWidget(self.label)
-        self.p_end_date = QtWidgets.QDateEdit(PreviousLab)
-        font = QtGui.QFont()
-        font.setPointSize(int(f'{font_size}'))
-        self.p_end_date.setFont(font)
-        self.p_end_date.setObjectName("p_end_date")
-        self.verticalLayout.addWidget(self.p_end_date)
-        self.label_13 = QtWidgets.QLabel(PreviousLab)
-        font = QtGui.QFont()
-        font.setPointSize(int(f'{font_size}'))
-        self.label_13.setFont(font)
-        self.label_13.setObjectName("label_13")
-        self.verticalLayout.addWidget(self.label_13)
-        self.p_lab_comment = QtWidgets.QTextEdit(PreviousLab)
-        font = QtGui.QFont()
-        font.setPointSize(int(f'{font_size}'))
-        self.p_lab_comment.setFont(font)
-        self.p_lab_comment.setObjectName("p_lab_comment")
-        self.verticalLayout.addWidget(self.p_lab_comment)
-        self.horizontalLayout_2 = QtWidgets.QHBoxLayout()
-        self.horizontalLayout_2.setObjectName("horizontalLayout_2")
-        self.buttonBox = QtWidgets.QPushButton(PreviousLab)
-        self.buttonBox.setObjectName("buttonBox")
-        self.horizontalLayout_2.addWidget(self.buttonBox)
-        self.clear_btn = QtWidgets.QPushButton(PreviousLab)
-        self.clear_btn.setObjectName("clear_btn")
-        self.horizontalLayout_2.addWidget(self.clear_btn)
-        self.cancel_btn = QtWidgets.QPushButton(PreviousLab)
-        self.cancel_btn.setObjectName("cancel_btn")
-        self.horizontalLayout_2.addWidget(self.cancel_btn)
-        self.verticalLayout.addLayout(self.horizontalLayout_2)
-
-        self.retranslateUi(PreviousLab)
-        QtCore.QMetaObject.connectSlotsByName(PreviousLab)
-
-    def retranslateUi(self, PreviousLab):
-        _translate = QtCore.QCoreApplication.translate
-        PreviousLab.setWindowTitle(_translate("PreviousLab", "Previous Lab 1"))
-        self.label_10.setText(_translate("PreviousLab", "Lab Acronym **"))
-        self.p_lab_acronym.setToolTip(_translate("PreviousLab",
-                                                 "<html><head/><body>"
-                                                 "<p>Experimentalist laboratory acronym</p></body></html>"))
-        self.label_2.setText(_translate("PreviousLab", "Status *"))
-        self.p_status.setToolTip(_translate("PreviousLab",
-                                            "<html><head/><body>"
-                                            "<p>Experimentalist\'s status in this laboratory</p></body></html>"))
-        self.label_12.setText(_translate("PreviousLab", "Beginning date **"))
-        self.p_begin_date.setToolTip(_translate("PreviousLab",
-                                                "<html><head/><body>"
-                                                "<p>Format: YYYY-MM-DD, beginning date of the experimentalist in this laboratory (<span style=\" font-weight:600;\">needed for DOI</span>)</p></body></html>"))
-        self.label.setText(_translate("PreviousLab", "Ending date **"))
-        self.p_end_date.setToolTip(_translate("PreviousLab",
-                                              "<html><head/><body>"
-                                              "<p>Format: YYYY-MM-DD, ending date of the experimentalist in this laboratory (<span style=\" font-weight:600;\">needed for DOI</span>)</p></body></html>"))
-        self.label_13.setText(_translate("PreviousLab", "Additional information"))
-        self.p_lab_comment.setToolTip(_translate("PreviousLab",
-                                                 "<html><head/><body>"
-                                                 "<p>Any additional information on this laboratory</p></body></html>"))
-        self.buttonBox.setText(_translate("PreviousLab", "Save and Close"))
-        self.clear_btn.setText(_translate("PreviousLab", "Clear this form"))
-        self.cancel_btn.setText(_translate("PreviousLab", "Close without change"))
+    # dialog windows
+    def dialog_critical(self, s):
+        dlg = QMessageBox(self)
+        dlg.setWindowTitle('Error!')
+        dlg.setText(s)
+        dlg.setIcon(QMessageBox.Critical)
+        dlg.show()
 
 
 # PREVIOUS labs CLASS
@@ -1767,16 +1009,27 @@ class XMLTemplatePreviousLab(QtWidgets.QDialog):
             labs_previous_data_array[self.previous_lab_edit - 1].clear()
 
     def add_previous_lab_action(self):
+        verification_Ok = 1
         if self.ui.p_lab_acronym.text().strip() == '':
-            AbsMandatoryWarning('Lab Acronym', '')
+            verification_Ok = 0
+            self.dialog_critical('Lab Acronym is mandatory!')
             self.ui.p_lab_acronym.setFocus()
         elif self.ui.p_begin_date.date().toString("yyyy-MM-dd") == '1900-01-01':
-            AbsMandatoryWarning('Beginning date', 'We need this for DOI')
+            verification_Ok = 0
+            self.dialog_critical('Beginning date is mandatory!\nWe need this for DOI')
             self.ui.p_begin_date.setFocus()
         elif self.ui.p_end_date.date().toString("yyyy-MM-dd") == '1900-01-01':
-            AbsMandatoryWarning('Ending date', 'We need this for DOI')
+            verification_Ok = 0
+            self.dialog_critical('Ending date is mandatory!\nWe need this for DOI')
             self.ui.p_end_date.setFocus()
-        else:
+        if verification_Ok and self.ui.p_status.currentIndex() == 0:
+            reply = QMessageBox.question(self, 'Message',
+                                         "Are you sure to leave the status empty?", QMessageBox.Yes |
+                                         QMessageBox.No, QMessageBox.No)
+            if reply == QMessageBox.No:
+                verification_Ok = 0
+                self.ui.p_status.setFocus()
+        if verification_Ok:
             if not labs_previous_data_array[self.previous_lab_edit - 1]:
                 labs_previous_data_array[self.previous_lab_edit - 1].append(self.ui.p_lab_acronym.text())
                 labs_previous_data_array[self.previous_lab_edit - 1].append(self.ui.p_status.currentIndex())
@@ -1797,73 +1050,13 @@ class XMLTemplatePreviousLab(QtWidgets.QDialog):
                 labs_previous_data_array[self.previous_lab_edit - 1][5] = self.ui.p_lab_comment.toPlainText()
             self.close()
 
-
-# MANDATORY warning CLASS
-class AbsMandatoryWarning(QtWidgets.QDialog):
-    def __init__(self, warning_type, warning_masg):
-        super(AbsMandatoryWarning, self).__init__()
-        # GUI
-        # window
-        self.setMinimumSize(275, 151)
-        self.setWindowTitle('Warning!')
-        # label
-        self.label_warning = QLabel()
-        self.label_warning.setStyleSheet('QLabel{color: rgb(228,76,0)}')
-        if warning_masg == "":
-            self.label_warning.setText(f'{warning_type} is mandatory!')
-        else:
-            self.label_warning.setText(f'{warning_type} is mandatory!\n{warning_masg}')
-            # button
-        self.ok_btn = QPushButton('Ok')
-        self.ok_btn.setStyleSheet('QPushButton{padding: 5px;}')
-        # layout
-        self.main_layout = QVBoxLayout()
-        self.main_layout.addWidget(self.label_warning)
-        self.main_layout.addWidget(self.ok_btn)
-        self.setLayout(self.main_layout)
-        # SIGNALS & SLOTS
-        self.ok_btn.clicked.connect(self.close_window)
-        # WINDOW SHOW
-        self.setWindowFlags(Qt.WindowStaysOnTopHint)
-        self.setWindowModality(Qt.ApplicationModal)
-        self.show()
-        self.exec_()
-
-    # SIGNALS
-    def close_window(self):
-        self.close()
-
-
-# OK warning CLASS
-class SavingOK(QtWidgets.QDialog):
-    def __init__(self):
-        super(SavingOK, self).__init__()
-        # GUI
-        # window
-        self.setMinimumSize(262, 151)
-        self.setWindowTitle('Saved!')
-        # label
-        self.label_warning = QLabel('The XML was saved!')
-        self.label_warning.setStyleSheet('QLabel{color: rgb(0,148,116)}')
-        # button
-        self.ok_btn = QPushButton('Ok')
-        self.ok_btn.setStyleSheet('QPushButton{padding: 5px;}')
-        # layout
-        self.main_layout = QVBoxLayout()
-        self.main_layout.addWidget(self.label_warning)
-        self.main_layout.addWidget(self.ok_btn)
-        self.setLayout(self.main_layout)
-        # SIGNALS & SLOTS
-        self.ok_btn.clicked.connect(self.close_window)
-        # WINDOW SHOW
-        self.setWindowFlags(Qt.WindowStaysOnTopHint)
-        self.setWindowModality(Qt.ApplicationModal)
-        self.show()
-        self.exec_()
-
-    # SIGNALS
-    def close_window(self):
-        self.close()
+    # dialog windows
+    def dialog_critical(self, s):
+        dlg = QMessageBox(self)
+        dlg.setWindowTitle('Error!')
+        dlg.setText(s)
+        dlg.setIcon(QMessageBox.Critical)
+        dlg.show()
 
 
 app = QtWidgets.QApplication([])
